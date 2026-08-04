@@ -1,14 +1,7 @@
-FROM php:8.2-cli
+FROM php:8.2-apache
 
-WORKDIR /app
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Install PostgreSQL support for Neon DB
-RUN docker-php-ext-install pdo pdo_pgsql
+COPY . /var/www/html/
 
-# Copy your PHP files
-COPY index.php .
-
-EXPOSE 8000
-
-# Start PHP server
-CMD ["php", "-S", "0.0.0.0:8000", "index.php"]
+EXPOSE 80

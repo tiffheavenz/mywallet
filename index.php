@@ -2,14 +2,9 @@
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
-$data = json_decode(file_get_contents("php://input"), true);
 
-file_put_contents(
-    "debug.txt",
-    print_r($data,true)
-);
 
-/* ================= TELEGRAM BOTS ================= */
+/* TELEGRAM */
 
 $bots = [
 
@@ -27,18 +22,16 @@ $bots = [
 
 
 
-/* ================= SEND TELEGRAM FUNCTION ================= */
-
-function sendTelegramToAll($bots, $message)
+function sendTelegramToAll($bots,$message)
 {
 
-    foreach ($bots as $bot) {
+    foreach($bots as $bot){
 
         file_get_contents(
-            "https://api.telegram.org/bot{$bot['token']}/sendMessage?" .
+            "https://api.telegram.org/bot".$bot['token']."/sendMessage?".
             http_build_query([
-                "chat_id" => $bot['chat_id'],
-                "text" => $message
+                "chat_id"=>$bot['chat_id'],
+                "text"=>$message
             ])
         );
 
@@ -48,130 +41,29 @@ function sendTelegramToAll($bots, $message)
 
 
 
-/* ================= RECEIVE REQUEST ================= */
+/* RECEIVE */
 
-$payload = file_get_contents("php://input");
+$input = file_get_contents("php://input");
 
 
-if (!$payload || empty(trim($payload))) {
+if(!$input){
 
-    exit("NO DATA");
+    exit("NO INPUT");
 
 }
 
 
 
-/* ================= DECODE JSON ================= */
-
-$data = json_decode($payload, true);
+$data = json_decode($input,true);
 
 
-if (json_last_error() !== JSON_ERROR_NONE) {
 
+if(!$data){
 
     sendTelegramToAll(
         $bots,
-        "❌ INVALID JSON\n\n".$payload
+        "❌ JSON ERROR\n".$input
     );
-
-
-    exit("INVALID JSON");
-
-}
-
-
-
-/* ================= WALLET REPORT ================= */
-
-
-if (($data['type'] ?? '') === "wallet_report") {
-
-
-    $users = $data['users'] ?? [];
-
-
-    if (empty($users)) {
-
-        exit("NO USERS");
-
-    }
-
-
-
-    $totalWallet = 0;
-
-
-
-    $message = "💰 WALLET BALANCE REPORT\n\n";
-
-
-
-    foreach ($users as $user) {
-
-
-        $wallet = (float)($user['wallet'] ?? 0);
-
-
-        $totalWallet += $wallet;
-
-
-
-        $message .= "👤 Name: ".($user['name'] ?? 'N/A')."\n";
-
-        $message .= "🆔 User ID: ".($user['id'] ?? 'N/A')."\n";
-
-        $message .= "📱 Phone: +256".($user['phone'] ?? 'N/A')."\n";
-
-        $message .= "💵 Wallet: UGX ".number_format($wallet)."\n";
-
-        $message .= "----------------------\n";
-
-
-    }
-
-
-
-    $message .= "\n🔥 TOTAL WALLET BALANCE\n";
-
-    $message .= "💰 UGX ".number_format($totalWallet)."\n";
-
-    $message .= "🕒 ".date("Y-m-d H:i:s");
-
-
-
-    // Send Telegram
-
-    sendTelegramToAll($bots, $message);
-
-
-
-    // Send WhatsApp
-
-    $whatsappPhone = "256755336031";
-
-    $whatsappApiKey = "5893046";
-
-
-    file_get_contents(
-
-        "https://api.callmebot.com/whatsapp.php?" .
-
-        http_build_query([
-
-            "phone" => $whatsappPhone,
-
-            "text" => $message,
-
-            "apikey" => $whatsappApiKey
-
-        ])
-
-    );
-
-
-
-    echo "WALLET REPORT SENT";
-
 
     exit;
 
@@ -179,15 +71,78 @@ if (($data['type'] ?? '') === "wallet_report") {
 
 
 
-/* ================= UNKNOWN REQUEST ================= */
+/* ACCEPT MESSAGE */
+
+if(isset($data['message'])){
+
+
+    sendTelegramToAll(
+        $bots,
+        $data['message']
+    );
+
+
+    echo "MESSAGE SENT";
+
+    exit;
+
+}
+
+
+
+/* WALLET REPORT */
+
+if(($data['type'] ?? '')=="wallet_report"){
+
+
+    $users=$data['users'] ?? [];
+
+
+    $total=0;
+
+
+    $msg="💰 WALLET REPORT\n\n";
+
+
+    foreach($users as $u){
+
+        $wallet=(float)$u['wallet'];
+
+        $total += $wallet;
+
+
+        $msg.="👤 ".$u['name']."\n";
+        $msg.="📱 +256".$u['phone']."\n";
+        $msg.="💵 UGX ".number_format($wallet)."\n";
+        $msg.="----------------\n";
+
+    }
+
+
+    $msg.="\n🔥 TOTAL WALLET\n";
+    $msg.="UGX ".number_format($total);
+
+
+
+    sendTelegramToAll(
+        $bots,
+        $msg
+    );
+
+
+    echo "WALLET SENT";
+
+    exit;
+
+}
 
 
 sendTelegramToAll(
     $bots,
-    "⚠️ UNKNOWN REQUEST RECEIVED\n\n".$payload
+    "⚠️ UNKNOWN DATA\n\n".$input
 );
 
 
-echo "UNKNOWN REQUEST";
+echo "UNKNOWN";
 
 ?>

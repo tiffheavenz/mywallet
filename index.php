@@ -1,35 +1,64 @@
 <?php
 
-ini_set('display_errors', 1);
+ini_set('display_errors',1);
 error_reporting(E_ALL);
 
-
-$bots = [
-
-    [
-        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
-        "chat_id" => "8940716704"
-    ]
-
-];
+header("Content-Type: application/json");
 
 
+$botToken = "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo";
+$chatId   = "8940716704";
 
-function sendTelegram($bots, $message)
+
+function sendTelegram($message)
 {
+    global $botToken, $chatId;
 
-    foreach($bots as $bot){
 
-        file_get_contents(
-            "https://api.telegram.org/bot".$bot['token']."/sendMessage?".
-            http_build_query([
-                "chat_id"=>$bot['chat_id'],
-                "text"=>$message
-            ])
+    $url = "https://api.telegram.org/bot".$botToken."/sendMessage";
+
+
+    $data = [
+        "chat_id"=>$chatId,
+        "text"=>$message
+    ];
+
+
+    $ch = curl_init($url);
+
+
+    curl_setopt_array($ch,[
+
+        CURLOPT_POST=>true,
+
+        CURLOPT_POSTFIELDS=>http_build_query($data),
+
+        CURLOPT_RETURNTRANSFER=>true
+
+    ]);
+
+
+    $response = curl_exec($ch);
+
+
+    if(curl_errno($ch)){
+        file_put_contents(
+            "telegram_error.txt",
+            curl_error($ch)
         );
-
     }
 
+
+    curl_close($ch);
+
+
+    file_put_contents(
+        "telegram_response.txt",
+        $response
+    );
+
+
+    return $response;
 }
 
 
@@ -40,19 +69,12 @@ $raw = file_get_contents("php://input");
 
 if(!$raw){
 
-    echo "NO DATA RECEIVED";
+    echo json_encode([
+        "status"=>"no data"
+    ]);
+
     exit;
-
 }
-
-
-
-// SAVE EVERYTHING RECEIVED
-file_put_contents(
-    "received.txt",
-    date("Y-m-d H:i:s")."\n".$raw."\n\n",
-    FILE_APPEND
-);
 
 
 
@@ -60,31 +82,36 @@ $data = json_decode($raw,true);
 
 
 
-$message = "🔥 RENDER RECEIVED\n\n";
+$message = "🔥 SHJEEEE WALLET REPORT\n\n";
 
 
-if($data){
+if(isset($data['users'])){
 
-    $message .= json_encode(
-        $data,
-        JSON_PRETTY_PRINT
-    );
 
-}else{
+    foreach($data['users'] as $user){
 
-    $message .= $raw;
+        $message .=
+        "👤 ".$user['name']."\n".
+        "📱 ".$user['phone']."\n".
+        "💰 UGX ".$user['wallet']."\n".
+        "----------------\n";
+
+    }
+
+
+    $message .= "\n🔥 TOTAL WALLET\n";
+    $message .= "UGX ".$data['total_wallet'];
 
 }
 
 
-
-sendTelegram(
-    $bots,
-    $message
-);
+$result = sendTelegram($message);
 
 
 
-echo "FORWARDED";
+echo json_encode([
+    "status"=>"sent",
+    "telegram"=>$result
+]);
 
 ?>

@@ -3,61 +3,26 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-/* ================= SECURITY ================= */
+/* ================= TELEGRAM ================= */
 
-$secret = "MY_SECRET_KEY";
-
-if (!isset($_GET['key']) || $_GET['key'] !== $secret) {
-    exit("Unauthorized");
-}
-
-/* ================= TELEGRAM (MULTIPLE BOTS) ================= */
-
+// Multiple bots (token + chat_id)
 $bots = [
     [
-        "token" => "8896732586:AAG2boPOp7mteDed11I2j7PYRn6L-Ln-3vQ",
-        "chat"  => "8940716704"
+        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
+        "chat_id" => "8940716704"
     ],
     [
-        "token" => "8880567979:AAEh_kpBSs7YzAYqLO_G6ZUqF-6m0nQJmWs",
-        "chat"  => "8938414761"
+        "token" => "8565074370:AAFz_Opi7kYiAJc5ptVHhsxNzIEPAZIYUpUE",
+        "chat_id" => "8938414761"
     ]
 ];
-
-/* ================= FUNCTION ================= */
-
-function sendToAllBots($bots, $text) {
-    foreach ($bots as $bot) {
-        @file_get_contents(
-            "https://api.telegram.org/bot{$bot['token']}/sendMessage?" .
-            http_build_query([
-                "chat_id" => $bot['chat'],
-                "text" => $text
-            ])
-        );
-    }
-}
-
-/* ================= DB CONNECTION ================= */
-
-try {
-    $pdo = new PDO(
-        "pgsql:host=ep-blue-sound-ayd48i6r.c-5.us-east-2.aws.neon.tech;port=5432;dbname=neondb;sslmode=require",
-        "neondb_owner",
-        "npg_v5ZXNhkD7Han",
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-} catch (PDOException $e) {
-    sendToAllBots($bots, "❌ DB CONNECTION FAILED\n" . $e->getMessage());
-    exit("DB ERROR");
-}
 
 /* ================= RECEIVE PAYLOAD ================= */
 
 $payload = file_get_contents("php://input");
 
 if (!$payload || empty(trim($payload))) {
-    exit("No payload");
+    exit("❌ No payload received");
 }
 
 /* ================= DECODE JSON ================= */
@@ -65,75 +30,68 @@ if (!$payload || empty(trim($payload))) {
 $data = json_decode($payload, true);
 
 if (json_last_error() !== JSON_ERROR_NONE) {
-    sendToAllBots($bots, "❌ INVALID JSON\n\n" . $payload);
+
+    $errorMessage = "❌ INVALID JSON RECEIVED\n\n" . $payload;
+
+    // Send error to ALL bots
+    foreach ($bots as $bot) {
+        file_get_contents(
+            "https://api.telegram.org/bot{$bot['token']}/sendMessage?" .
+            http_build_query([
+                "chat_id" => $bot['chat_id'],
+                "text" => $errorMessage
+            ])
+        );
+    }
+
     exit("Invalid JSON");
 }
+/* ================= VALUES ================= */
 
-/* ================= EXTRACT VALUES ================= */
-
-$status    = strtoupper(trim($data['status'] ?? 'UNKNOWN'));
-$reference = trim($data['customer_reference'] ?? 'N/A');
-$number    = trim($data['msisdn'] ?? 'N/A');
+$userId    = $data['user_id'] ?? 'N/A';
+$name      = $data['name'] ?? 'N/A';
 $amount    = (float)($data['amount'] ?? 0);
-$provider  = trim($data['provider'] ?? 'N/A');
-$msg       = trim($data['message'] ?? '');
-$time      = trim($data['completed_at'] ?? date("Y-m-d H:i:s"));
+$fee       = (float)($data['fee'] ?? 0);
+$netAmount = (float)($data['net_amount'] ?? 0);
+$reference = $data['reference'] ?? 'N/A';
+$status    = strtoupper($data['status'] ?? 'PENDING');
+$time      = date("Y-m-d H:i:s");
 
-/* ================= FORMAT MESSAGE ================= */
+/* ================= TELEGRAM MESSAGE ================= */
 
-$title = ($status === "SUCCESS")
-    ? "✅ PAYMENT SUCCESS"
-    : "❌ PAYMENT FAILED";
+$message  = "💸 WITHDRAWAL REQUEST\n\n";
+$message .= "👤 User ID: ".$userId."\n";
+$message .= "🧑 Name: ".$name."\n";
+$message .= "💰 Amount: UGX ".number_format($amount)."\n";
+$message .= "💸 Fee: UGX ".number_format($fee)."\n";
+$message .= "✅ Net Amount: UGX ".number_format($netAmount)."\n";
+$message .= "📌 Reference: ".$reference."\n";
+$message .= "📋 Status: ".$status."\n";
+$message .= "🕒 Time: ".$time;
 
-$message  = "{$title}\n\n";
-$message .= "📌 Ref: {$reference}\n";
-$message .= "📱 Number: {$number}\n";
-$message .= "💰 Amount: UGX " . number_format($amount) . "\n";
-$message .= "🏦 Provider: {$provider}\n";
-$message .= "📝 Msg: {$msg}\n";
-$message .= "🕒 Time: {$time}";
+/* ================= SEND TO TELEGRAM ================= */
 
-/* ================= SEND TO ALL BOTS ================= */
+file_get_contents(
+    "https://api.telegram.org/bot{$botToken}/sendMessage?" .
+    http_build_query([
+        "chat_id" => $chatId,
+        "text" => $message
+    ])
+);
 
-sendToAllBots($bots, $message);
+echo "WITHDRAWAL RECEIVED";
+/* ================= SEND TO WHATSAPP (CALLMEBOT) ================= */
 
-/* ================= STORE ONLY SUCCESS ================= */
+$whatsappPhone = "256755336031";
+$whatsappApiKey = "5893046";
 
-if ($status !== "SUCCESS") {
-    echo "IGNORED";
-    exit;
-}
+$whatsappMessage = urlencode($message);
 
-try {
+$whatsappUrl = "https://api.callmebot.com/whatsapp.php?" . http_build_query([
+    "phone" => $whatsappPhone,
+    "text" => $message,
+    "apikey" => $whatsappApiKey
+]);
 
-    $stmt = $pdo->prepare("
-        INSERT INTO transactions
-        (reference, status, amount, msisdn, provider, message, completed_at)
-        VALUES
-        (:reference, :status, :amount, :msisdn, :provider, :message, :completed_at)
-        ON CONFLICT (reference)
-        DO UPDATE SET
-            status = EXCLUDED.status,
-            amount = EXCLUDED.amount,
-            msisdn = EXCLUDED.msisdn,
-            provider = EXCLUDED.provider,
-            message = EXCLUDED.message,
-            completed_at = EXCLUDED.completed_at
-    ");
-
-    $stmt->execute([
-        ":reference"    => $reference,
-        ":status"       => $status,
-        ":amount"       => $amount,
-        ":msisdn"       => $number,
-        ":provider"     => $provider,
-        ":message"      => $msg,
-        ":completed_at" => $time
-    ]);
-
-    echo "SUCCESS STORED";
-
-} catch (PDOException $e) {
-    sendToAllBots($bots, "❌ DB INSERT ERROR\n" . $e->getMessage());
-    echo "DB ERROR";
-}
+file_get_contents($whatsappUrl);
+?>

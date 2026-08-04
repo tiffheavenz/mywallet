@@ -3,95 +3,186 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-/* ================= TELEGRAM ================= */
 
-// Multiple bots (token + chat_id)
+/* ================= TELEGRAM BOTS ================= */
+
 $bots = [
+
     [
-        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
-        "chat_id" => "8940716704"
+        "token" => "YOUR_BOT_TOKEN_1",
+        "chat_id" => "YOUR_CHAT_ID_1"
     ],
+
     [
-        "token" => "8565074370:AAFz_Opi7kYiAJc5ptVHhsxNzIEPAZIYUpUE",
-        "chat_id" => "8938414761"
+        "token" => "YOUR_BOT_TOKEN_2",
+        "chat_id" => "YOUR_CHAT_ID_2"
     ]
+
 ];
 
-/* ================= RECEIVE PAYLOAD ================= */
+
+
+/* ================= SEND TELEGRAM FUNCTION ================= */
+
+function sendTelegramToAll($bots, $message)
+{
+
+    foreach ($bots as $bot) {
+
+        file_get_contents(
+            "https://api.telegram.org/bot{$bot['token']}/sendMessage?" .
+            http_build_query([
+                "chat_id" => $bot['chat_id'],
+                "text" => $message
+            ])
+        );
+
+    }
+
+}
+
+
+
+/* ================= RECEIVE REQUEST ================= */
 
 $payload = file_get_contents("php://input");
 
+
 if (!$payload || empty(trim($payload))) {
-    exit("❌ No payload received");
+
+    exit("NO DATA");
+
 }
+
+
 
 /* ================= DECODE JSON ================= */
 
 $data = json_decode($payload, true);
 
+
 if (json_last_error() !== JSON_ERROR_NONE) {
 
-    $errorMessage = "❌ INVALID JSON RECEIVED\n\n" . $payload;
 
-    // Send error to ALL bots
-    foreach ($bots as $bot) {
-        file_get_contents(
-            "https://api.telegram.org/bot{$bot['token']}/sendMessage?" .
-            http_build_query([
-                "chat_id" => $bot['chat_id'],
-                "text" => $errorMessage
-            ])
-        );
+    sendTelegramToAll(
+        $bots,
+        "❌ INVALID JSON\n\n".$payload
+    );
+
+
+    exit("INVALID JSON");
+
+}
+
+
+
+/* ================= WALLET REPORT ================= */
+
+
+if (($data['type'] ?? '') === "wallet_report") {
+
+
+    $users = $data['users'] ?? [];
+
+
+    if (empty($users)) {
+
+        exit("NO USERS");
+
     }
 
-    exit("Invalid JSON");
+
+
+    $totalWallet = 0;
+
+
+
+    $message = "💰 WALLET BALANCE REPORT\n\n";
+
+
+
+    foreach ($users as $user) {
+
+
+        $wallet = (float)($user['wallet'] ?? 0);
+
+
+        $totalWallet += $wallet;
+
+
+
+        $message .= "👤 Name: ".($user['name'] ?? 'N/A')."\n";
+
+        $message .= "🆔 User ID: ".($user['id'] ?? 'N/A')."\n";
+
+        $message .= "📱 Phone: +256".($user['phone'] ?? 'N/A')."\n";
+
+        $message .= "💵 Wallet: UGX ".number_format($wallet)."\n";
+
+        $message .= "----------------------\n";
+
+
+    }
+
+
+
+    $message .= "\n🔥 TOTAL WALLET BALANCE\n";
+
+    $message .= "💰 UGX ".number_format($totalWallet)."\n";
+
+    $message .= "🕒 ".date("Y-m-d H:i:s");
+
+
+
+    // Send Telegram
+
+    sendTelegramToAll($bots, $message);
+
+
+
+    // Send WhatsApp
+
+    $whatsappPhone = "256755336031";
+
+    $whatsappApiKey = "5893046";
+
+
+    file_get_contents(
+
+        "https://api.callmebot.com/whatsapp.php?" .
+
+        http_build_query([
+
+            "phone" => $whatsappPhone,
+
+            "text" => $message,
+
+            "apikey" => $whatsappApiKey
+
+        ])
+
+    );
+
+
+
+    echo "WALLET REPORT SENT";
+
+
+    exit;
+
 }
-/* ================= VALUES ================= */
 
-$userId    = $data['user_id'] ?? 'N/A';
-$name      = $data['name'] ?? 'N/A';
-$amount    = (float)($data['amount'] ?? 0);
-$fee       = (float)($data['fee'] ?? 0);
-$netAmount = (float)($data['net_amount'] ?? 0);
-$reference = $data['reference'] ?? 'N/A';
-$status    = strtoupper($data['status'] ?? 'PENDING');
-$time      = date("Y-m-d H:i:s");
 
-/* ================= TELEGRAM MESSAGE ================= */
 
-$message  = "💸 WITHDRAWAL REQUEST\n\n";
-$message .= "👤 User ID: ".$userId."\n";
-$message .= "🧑 Name: ".$name."\n";
-$message .= "💰 Amount: UGX ".number_format($amount)."\n";
-$message .= "💸 Fee: UGX ".number_format($fee)."\n";
-$message .= "✅ Net Amount: UGX ".number_format($netAmount)."\n";
-$message .= "📌 Reference: ".$reference."\n";
-$message .= "📋 Status: ".$status."\n";
-$message .= "🕒 Time: ".$time;
+/* ================= UNKNOWN REQUEST ================= */
 
-/* ================= SEND TO TELEGRAM ================= */
 
-file_get_contents(
-    "https://api.telegram.org/bot{$botToken}/sendMessage?" .
-    http_build_query([
-        "chat_id" => $chatId,
-        "text" => $message
-    ])
+sendTelegramToAll(
+    $bots,
+    "⚠️ UNKNOWN REQUEST RECEIVED\n\n".$payload
 );
 
-echo "WITHDRAWAL RECEIVED";
-/* ================= SEND TO WHATSAPP (CALLMEBOT) ================= */
 
-$whatsappPhone = "256755336031";
-$whatsappApiKey = "5893046";
+echo "UNKNOWN REQUEST";
 
-$whatsappMessage = urlencode($message);
-
-$whatsappUrl = "https://api.callmebot.com/whatsapp.php?" . http_build_query([
-    "phone" => $whatsappPhone,
-    "text" => $message,
-    "apikey" => $whatsappApiKey
-]);
-
-file_get_contents($whatsappUrl);
 ?>

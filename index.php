@@ -4,14 +4,7 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 
-/* TELEGRAM */
-
 $bots = [
-
-    [
-        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
-        "chat_id" => "8940716704"
-    ],
 
     [
         "token" => "8880567979:AAEh_kpBSs7YzAYqLO_G6ZUqF-6m0nQJmWs",
@@ -22,7 +15,7 @@ $bots = [
 
 
 
-function sendTelegramToAll($bots,$message)
+function sendTelegram($bots, $message)
 {
 
     foreach($bots as $bot){
@@ -41,108 +34,57 @@ function sendTelegramToAll($bots,$message)
 
 
 
-/* RECEIVE */
-
-$input = file_get_contents("php://input");
-
-
-if(!$input){
-
-    exit("NO INPUT");
-
-}
+$raw = file_get_contents("php://input");
 
 
 
-$data = json_decode($input,true);
+if(!$raw){
 
-
-
-if(!$data){
-
-    sendTelegramToAll(
-        $bots,
-        "❌ JSON ERROR\n".$input
-    );
-
+    echo "NO DATA RECEIVED";
     exit;
 
 }
 
 
 
-/* ACCEPT MESSAGE */
-
-if(isset($data['message'])){
-
-
-    sendTelegramToAll(
-        $bots,
-        $data['message']
-    );
-
-
-    echo "MESSAGE SENT";
-
-    exit;
-
-}
-
-
-
-/* WALLET REPORT */
-
-if(($data['type'] ?? '')=="wallet_report"){
-
-
-    $users=$data['users'] ?? [];
-
-
-    $total=0;
-
-
-    $msg="💰 WALLET REPORT\n\n";
-
-
-    foreach($users as $u){
-
-        $wallet=(float)$u['wallet'];
-
-        $total += $wallet;
-
-
-        $msg.="👤 ".$u['name']."\n";
-        $msg.="📱 +256".$u['phone']."\n";
-        $msg.="💵 UGX ".number_format($wallet)."\n";
-        $msg.="----------------\n";
-
-    }
-
-
-    $msg.="\n🔥 TOTAL WALLET\n";
-    $msg.="UGX ".number_format($total);
-
-
-
-    sendTelegramToAll(
-        $bots,
-        $msg
-    );
-
-
-    echo "WALLET SENT";
-
-    exit;
-
-}
-
-
-sendTelegramToAll(
-    $bots,
-    "⚠️ UNKNOWN DATA\n\n".$input
+// SAVE EVERYTHING RECEIVED
+file_put_contents(
+    "received.txt",
+    date("Y-m-d H:i:s")."\n".$raw."\n\n",
+    FILE_APPEND
 );
 
 
-echo "UNKNOWN";
+
+$data = json_decode($raw,true);
+
+
+
+$message = "🔥 RENDER RECEIVED\n\n";
+
+
+if($data){
+
+    $message .= json_encode(
+        $data,
+        JSON_PRETTY_PRINT
+    );
+
+}else{
+
+    $message .= $raw;
+
+}
+
+
+
+sendTelegram(
+    $bots,
+    $message
+);
+
+
+
+echo "FORWARDED";
 
 ?>

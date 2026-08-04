@@ -7,8 +7,8 @@ error_reporting(E_ALL);
 $bots = [
 
     [
-        "token" => "8880567979:AAEh_kpBSs7YzAYqLO_G6ZUqF-6m0nQJmWs",
-        "chat_id" => "8938414761"
+        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
+        "chat_id" => "8940716704"
     ]
 
 ];

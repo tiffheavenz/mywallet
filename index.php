@@ -2,15 +2,20 @@
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+$data = json_decode(file_get_contents("php://input"), true);
 
+file_put_contents(
+    "debug.txt",
+    print_r($data,true)
+);
 
 /* ================= TELEGRAM BOTS ================= */
 
 $bots = [
 
     [
-        "token" => "YOUR_BOT_TOKEN_1",
-        "chat_id" => "YOUR_CHAT_ID_1"
+        "token" => "8677498486:AAFyHSstosvrtaBJwj-_eV25U3eWKkbKwOo",
+        "chat_id" => "8940716704"
     ],
 
     [

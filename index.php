@@ -14,7 +14,7 @@ $bots = [
     ],
 
     [
-        "token" => "8565074370:AAFz_Opi7kYiAJc5ptVHhsxNzIEPAZIYUpUE",
+        "token" => "8880567979:AAEh_kpBSs7YzAYqLO_G6ZUqF-6m0nQJmWs",
         "chat_id" => "8938414761"
     ]
 

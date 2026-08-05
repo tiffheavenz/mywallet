@@ -27,35 +27,46 @@ $bots = [
 $payload = file_get_contents("php://input");
 
 
-// STOP EMPTY LOADS
 
-if (!$payload || trim($payload) == "") {
+/* ================= IGNORE EMPTY PINGS ================= */
+
+if (!$payload || trim($payload) === "") {
 
     echo json_encode([
-        "status"=>"ignored",
-        "reason"=>"empty payload"
+        "status" => "ignored",
+        "reason" => "empty payload"
     ]);
 
     exit;
-
 }
 
 
 
-
-/* ================= GET MESSAGE ================= */
+/* ================= EXTRACT MESSAGE ================= */
 
 $data = json_decode($payload, true);
 
 
+$message = "";
+
+
+// JSON DATA WITH MESSAGE
 if (
     json_last_error() === JSON_ERROR_NONE &&
-    isset($data['message'])
+    isset($data['message']) &&
+    trim($data['message']) !== ""
 ) {
 
     $message = trim($data['message']);
 
-} else {
+}
+
+
+// RAW DATA
+elseif (
+    json_last_error() !== JSON_ERROR_NONE &&
+    trim($payload) !== ""
+) {
 
     $message = trim($payload);
 
@@ -81,23 +92,25 @@ $message = trim($message);
 
 
 
-// STOP IF MESSAGE IS EMPTY AFTER CLEANING
+/* ================= STOP EMPTY MESSAGE ================= */
 
-if ($message == "") {
+if ($message === "") {
 
     echo json_encode([
-        "status"=>"ignored",
-        "reason"=>"empty message"
+        "status" => "ignored",
+        "reason" => "empty message after cleaning"
     ]);
 
     exit;
-
 }
 
 
 
 
 /* ================= SEND TELEGRAM ================= */
+
+$results = [];
+
 
 foreach ($bots as $bot) {
 
@@ -129,9 +142,9 @@ foreach ($bots as $bot) {
 
         CURLOPT_RETURNTRANSFER => true,
 
-        CURLOPT_POSTFIELDS => http_build_query($params),
+        CURLOPT_POSTFIELDS => $params,
 
-        CURLOPT_TIMEOUT => 10
+        CURLOPT_TIMEOUT => 15
 
     ]);
 
@@ -143,16 +156,34 @@ foreach ($bots as $bot) {
 
     if(curl_errno($ch)){
 
-        error_log(
-            "TELEGRAM ERROR ".$bot['chat_id']." : ".
-            curl_error($ch)
-        );
+
+        $results[] = [
+
+            "chat_id"=>$bot['chat_id'],
+
+            "status"=>"curl_error",
+
+            "error"=>curl_error($ch)
+
+        ];
+
 
     } else {
 
-        error_log(
-            "TELEGRAM RESPONSE ".$bot['chat_id']." : ".$response
-        );
+
+        $telegram = json_decode($response,true);
+
+
+        $results[] = [
+
+            "chat_id"=>$bot['chat_id'],
+
+            "status"=>$telegram['ok'] ?? false,
+
+            "response"=>$telegram
+
+        ];
+
 
     }
 
@@ -169,10 +200,12 @@ foreach ($bots as $bot) {
 
 echo json_encode([
 
-    "status"=>"sent",
+    "status"=>"completed",
 
-    "message"=>$message
+    "message_sent"=>$message,
 
-]);
+    "telegram_results"=>$results
+
+], JSON_PRETTY_PRINT);
 
 ?>

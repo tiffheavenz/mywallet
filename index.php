@@ -25,11 +25,10 @@ $bots = [
 
 $payload = file_get_contents("php://input");
 
-
 $time = date("Y-m-d H:i:s");
 
 
-$message = "🔥 RENDER MESSAGE RECEIVED\n\n";
+$message  = "🔥 RENDER MESSAGE RECEIVED\n\n";
 $message .= "🕒 TIME: ".$time."\n\n";
 
 
@@ -39,35 +38,44 @@ if(!$payload || empty(trim($payload))){
 
 } else {
 
-
-    // TRY JSON FIRST
-
     $data = json_decode($payload, true);
 
 
     if(json_last_error() === JSON_ERROR_NONE){
 
 
-        $message .= "📦 JSON DATA:\n\n";
+        /*
+        If payload contains message from ping2,
+        extract it cleanly
+        */
 
-        $message .= json_encode(
-            $data,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-        );
+        if(isset($data['message'])){
+
+            $message .= $data['message'];
+
+        } else {
+
+            $message .= json_encode(
+                $data,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+            );
+
+        }
 
 
     } else {
 
-
-        // NOT JSON, SEND RAW TEXT
-
-        $message .= "📝 RAW DATA:\n\n";
 
         $message .= $payload;
 
     }
 
 }
+
+
+/* ================= FORCE TABLE FORMAT ================= */
+
+$message = "```\n".$message."\n```";
 
 
 
@@ -79,14 +87,22 @@ foreach($bots as $bot){
     $url = "https://api.telegram.org/bot".$bot['token']."/sendMessage";
 
 
-    file_get_contents($url . "?" . http_build_query([
+    $response = file_get_contents($url . "?" . http_build_query([
 
         "chat_id" => $bot['chat_id'],
 
-        "text" => $message
+        "text" => $message,
+
+        "parse_mode" => "Markdown"
 
     ]));
 
+
+    if($response === false){
+
+        error_log("Telegram failed for ".$bot['chat_id']);
+
+    }
 
 }
 

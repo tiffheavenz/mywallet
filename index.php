@@ -25,14 +25,10 @@ $bots = [
 
 $payload = file_get_contents("php://input");
 
-$time = date("Y-m-d H:i:s");
 
+if (!$payload || trim($payload) == "") {
 
-/* ================= BUILD MESSAGE ================= */
-
-if(!$payload || trim($payload) === ""){
-
-    $finalMessage = "⚠️ EMPTY PAYLOAD\n\n🕒 ".$time;
+    $message = "⚠️ EMPTY PAYLOAD";
 
 } else {
 
@@ -40,29 +36,15 @@ if(!$payload || trim($payload) === ""){
     $data = json_decode($payload, true);
 
 
-    if(json_last_error() === JSON_ERROR_NONE){
+    if (json_last_error() === JSON_ERROR_NONE && isset($data['message'])) {
 
-
-        // ONLY TAKE THE MESSAGE SENT FROM PING2
-
-        if(isset($data['message'])){
-
-            $finalMessage = $data['message'];
-
-        } else {
-
-            $finalMessage = json_encode(
-                $data,
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-            );
-
-        }
-
+        // ONLY GET MESSAGE FROM PING2
+        $message = trim($data['message']);
 
     } else {
 
-
-        $finalMessage = $payload;
+        // IF RAW TEXT
+        $message = trim($payload);
 
     }
 
@@ -70,19 +52,27 @@ if(!$payload || trim($payload) === ""){
 
 
 
-/* ================= TELEGRAM FORMAT ================= */
+/* ================= CLEAN MESSAGE ================= */
 
-// Force monospace table view
+// Remove unwanted previous headers if they exist
+$message = str_replace(
+    [
+        "🔥 RENDER MESSAGE RECEIVED",
+        "🕒 TIME:",
+        "📦 JSON DATA:",
+        "```"
+    ],
+    "",
+    $message
+);
 
-$telegramMessage = "```\n";
-$telegramMessage .= $finalMessage;
-$telegramMessage .= "\n```";
+$message = trim($message);
 
 
 
-/* ================= SEND TO ALL BOTS ================= */
+/* ================= SEND TELEGRAM ================= */
 
-foreach($bots as $bot){
+foreach ($bots as $bot) {
 
 
     $url = "https://api.telegram.org/bot".$bot['token']."/sendMessage";
@@ -92,7 +82,7 @@ foreach($bots as $bot){
 
         "chat_id" => $bot['chat_id'],
 
-        "text" => $telegramMessage,
+        "text" => "```\n".$message."\n```",
 
         "parse_mode" => "Markdown"
 
@@ -115,17 +105,7 @@ foreach($bots as $bot){
     ]);
 
 
-    $response = curl_exec($ch);
-
-
-    if(curl_errno($ch)){
-
-        error_log(
-            "TELEGRAM ERROR ".$bot['chat_id']." : ".
-            curl_error($ch)
-        );
-
-    }
+    curl_exec($ch);
 
 
     curl_close($ch);
@@ -138,9 +118,9 @@ foreach($bots as $bot){
 
 echo json_encode([
 
-    "status" => "received",
+    "status"=>"sent",
 
-    "time" => $time
+    "message"=>$message
 
 ]);
 

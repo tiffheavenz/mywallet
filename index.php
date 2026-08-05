@@ -21,32 +21,43 @@ $bots = [
 ];
 
 
+
 /* ================= RECEIVE PAYLOAD ================= */
 
 $payload = file_get_contents("php://input");
 
 
+// STOP EMPTY LOADS
+
 if (!$payload || trim($payload) == "") {
 
-    $message = "⚠️ EMPTY PAYLOAD";
+    echo json_encode([
+        "status"=>"ignored",
+        "reason"=>"empty payload"
+    ]);
+
+    exit;
+
+}
+
+
+
+
+/* ================= GET MESSAGE ================= */
+
+$data = json_decode($payload, true);
+
+
+if (
+    json_last_error() === JSON_ERROR_NONE &&
+    isset($data['message'])
+) {
+
+    $message = trim($data['message']);
 
 } else {
 
-
-    $data = json_decode($payload, true);
-
-
-    if (json_last_error() === JSON_ERROR_NONE && isset($data['message'])) {
-
-        // ONLY GET MESSAGE FROM PING2
-        $message = trim($data['message']);
-
-    } else {
-
-        // IF RAW TEXT
-        $message = trim($payload);
-
-    }
+    $message = trim($payload);
 
 }
 
@@ -54,7 +65,6 @@ if (!$payload || trim($payload) == "") {
 
 /* ================= CLEAN MESSAGE ================= */
 
-// Remove unwanted previous headers if they exist
 $message = str_replace(
     [
         "🔥 RENDER MESSAGE RECEIVED",
@@ -66,7 +76,24 @@ $message = str_replace(
     $message
 );
 
+
 $message = trim($message);
+
+
+
+// STOP IF MESSAGE IS EMPTY AFTER CLEANING
+
+if ($message == "") {
+
+    echo json_encode([
+        "status"=>"ignored",
+        "reason"=>"empty message"
+    ]);
+
+    exit;
+
+}
+
 
 
 
@@ -75,7 +102,10 @@ $message = trim($message);
 foreach ($bots as $bot) {
 
 
-    $url = "https://api.telegram.org/bot".$bot['token']."/sendMessage";
+    $url = 
+    "https://api.telegram.org/bot".
+    $bot['token'].
+    "/sendMessage";
 
 
     $params = [
@@ -87,6 +117,7 @@ foreach ($bots as $bot) {
         "parse_mode" => "Markdown"
 
     ];
+
 
 
     $ch = curl_init($url);
@@ -105,12 +136,32 @@ foreach ($bots as $bot) {
     ]);
 
 
-    curl_exec($ch);
+
+    $response = curl_exec($ch);
+
+
+
+    if(curl_errno($ch)){
+
+        error_log(
+            "TELEGRAM ERROR ".$bot['chat_id']." : ".
+            curl_error($ch)
+        );
+
+    } else {
+
+        error_log(
+            "TELEGRAM RESPONSE ".$bot['chat_id']." : ".$response
+        );
+
+    }
+
 
 
     curl_close($ch);
 
 }
+
 
 
 
